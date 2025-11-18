@@ -2,107 +2,123 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Çevrim İçi XOX</title>
+  <title>XOX Oyunu</title>
   <style>
-    body { text-align:center; background:#111; color:white; font-family:Arial; }
-    h1 { margin-top:30px; }
+    body {
+      text-align: center;
+      background: #111;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+    h1 {
+      margin-top: 30px;
+    }
     #board {
-      width:300px;
-      margin:20px auto;
-      display:grid;
-      grid-template-columns:repeat(3, 100px);
-      gap:5px;
+      width: 300px;
+      margin: 20px auto;
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 5px;
     }
     .cell {
-      width:100px; height:100px;
-      background:#222;
-      font-size:60px;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      cursor:pointer;
-      border-radius:10px;
-      user-select:none;
+      width: 100px;
+      height: 100px;
+      background: #222;
+      font-size: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
     }
-    .cell:hover { background:#333; }
-    #status { margin-top:10px; }
-    button { margin:5px; padding:8px 14px; }
+    .cell:active {
+      background: #333;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 14px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      background: #0a84ff;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:active {
+      background: #0060c9;
+    }
   </style>
 
-  <!-- Firebase compat scriptleri (global firebase değişkeni verir) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
   <script>
-    // Firebase ayarların
-    const firebaseConfig = {
-      apiKey: "AIzaSyDX0wA69-G_EnDIOXnQZlEfaD6lsQEkJ_k",
-      authDomain: "coop2025-93420.firebaseapp.com",
-      projectId: "coop2025-93420",
-      storageBucket: "coop2025-93420.firebasestorage.app",
-      messagingSenderId: "671774331816",
-      appId: "1:671774331816:web:138d0d76ad4d2c7e16439d",
-      measurementId: "G-2Z4SYD5NBL",
-      databaseURL: "https://coop2025-93420-default-rtdb.europe-west1.firebasedatabase.app/"
-    };
-
-    // Firebase başlat
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // Oda / tahta referansı
-    const roomRef = db.ref("oda1");
-    const boardRef = roomRef.child("board");
-
     let board = ["","","","","","","","",""];
-    let mySymbol = ""; // "X" veya "O"
+    let currentPlayer = "X";
+    let gameOver = false;
 
-    // Sayfa açılınca tahtayı dinle
-    boardRef.on("value", (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        board = data;
-      }
-      refreshBoard();
-    });
+    const winLines = [
+      [0,1,2], [3,4,5], [6,7,8], // yatay
+      [0,3,6], [1,4,7], [2,5,8], // dikey
+      [0,4,8], [2,4,6]           // çapraz
+    ];
 
     function refreshBoard() {
       for (let i = 0; i < 9; i++) {
-        const cell = document.getElementById("c" + i);
-        cell.innerText = board[i] || "";
+        document.getElementById("c" + i).innerText = board[i];
       }
     }
 
-    // Sembol seçme
-    function chooseSymbol(symbol) {
-      mySymbol = symbol;
-      document.getElementById("status").innerText =
-        "Sen: " + mySymbol + "   |  Diğer kişi de diğer harfi seçsin.";
+    function checkWin(player) {
+      return winLines.some(line =>
+        line.every(idx => board[idx] === player)
+      );
     }
 
-    // Hücreye tıklama
     function playCell(index) {
-      if (!mySymbol) {
-        alert("Önce X veya O seç.");
+      if (gameOver) return;
+      if (board[index] !== "") return;
+
+      board[index] = currentPlayer;
+      refreshBoard();
+
+      if (checkWin(currentPlayer)) {
+        document.getElementById("status").innerText =
+          currentPlayer + " kazandı!";
+        gameOver = true;
         return;
       }
-      if (board[index] !== "") {
-        return; // dolu hücre
+
+      if (board.every(cell => cell !== "")) {
+        document.getElementById("status").innerText = "Berabere!";
+        gameOver = true;
+        return;
       }
-      board[index] = mySymbol;
-      boardRef.set(board); // herkesin tahtası güncellenir
+
+      currentPlayer = (currentPlayer === "X") ? "O" : "X";
+      document.getElementById("status").innerText =
+        "Sıra: " + currentPlayer;
     }
+
+    function resetGame() {
+      board = ["","","","","","","","",""];
+      currentPlayer = "X";
+      gameOver = false;
+      refreshBoard();
+      document.getElementById("status").innerText = "Sıra: X";
+    }
+
+    window.onload = resetGame;
   </script>
 </head>
 <body>
-  <h1>Çevrim İçi XOX</h1>
+  <h1>XOX Oyunu</h1>
 
-  <div>
-    <button onclick="chooseSymbol('X')">X olarak oyna</button>
-    <button onclick="chooseSymbol('O')">O olarak oyna</button>
-  </div>
-
-  <div id="status">Önce X veya O seç.</div>
+  <div id="status">Sıra: X</div>
 
   <div id="board">
     <div class="cell" id="c0" onclick="playCell(0)"></div>
@@ -116,6 +132,8 @@
     <div class="cell" id="c8" onclick="playCell(8)"></div>
   </div>
 
-  <p>Linki sevgiline gönderin; biri X, diğeri O seçip aynı tahtada oynayabilirsiniz.</p>
+  <button onclick="resetGame()">Yeniden Başlat</button>
+
+  <p>Aynı telefondan iki kişi sırayla X ve O oynayabilir.</p>
 </body>
 </html>
