@@ -28,22 +28,47 @@
     #subtitle {
       font-size: 13px;
       color: #bbbbff;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
     }
 
     #gameCard {
       background: rgba(0, 0, 0, 0.55);
       border-radius: 16px;
-      padding: 16px 20px 20px;
+      padding: 14px 18px 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-      max-width: 360px;
+      max-width: 380px;
       width: 100%;
       box-sizing: border-box;
     }
 
+    #roleRow {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    .roleBtn {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: none;
+      font-size: 13px;
+      cursor: pointer;
+      background: #222;
+      color: #ddd;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    }
+
+    .roleBtn.active {
+      background: linear-gradient(90deg, #ff9f0a, #ff375f);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(255,159,10,0.7);
+    }
+
     #status {
       margin-top: 4px;
-      font-size: 16px;
+      font-size: 15px;
       cursor: pointer;
     }
 
@@ -56,7 +81,7 @@
     #board {
       width: 100%;
       max-width: 320px;
-      margin: 16px auto 8px;
+      margin: 12px auto 8px;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 6px;
@@ -101,8 +126,8 @@
 
     #resetBtn {
       margin-top: 10px;
-      padding: 10px 18px;
-      font-size: 15px;
+      padding: 9px 16px;
+      font-size: 14px;
       border-radius: 999px;
       border: none;
       background: linear-gradient(90deg, #0a84ff, #4c6fff);
@@ -119,11 +144,11 @@
     #hint {
       font-size: 11px;
       color: #bbbbbb;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     #conn {
-      margin-top: 10px;
+      margin-top: 8px;
       font-size: 11px;
       color: #999;
     }
@@ -142,7 +167,6 @@
     }
   </style>
 
-  <!-- Firebase + oyun scripti -->
   <script type="module">
     // Firebase modülleri
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -153,7 +177,7 @@
       set
     } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-    // Firebase ayarların (senin projen)
+    // Firebase ayarların
     const firebaseConfig = {
       apiKey: "AIzaSyDX0wA69-G_EnDIOXnQZlEfaD6lsQEkJ_k",
       authDomain: "coop2025-93420.firebaseapp.com",
@@ -165,11 +189,10 @@
       databaseURL: "https://coop2025-93420-default-rtdb.europe-west1.firebasedatabase.app"
     };
 
-    // Firebase başlat
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Tek oda: oda1
+    // Tek oda
     const gameRef = ref(db, "xox/oda1");
 
     const winLines = [
@@ -188,7 +211,9 @@
 
     let localState = structuredClone(defaultState);
 
-    // Ekranı güncelle
+    // BU TELEFONUN ROLÜ: "X" veya "O" (seçildikten sonra değişmez)
+    let mySymbol = null;
+
     function render(state) {
       for (let i = 0; i < 9; i++) {
         const cell = document.getElementById("c" + i);
@@ -213,8 +238,9 @@
             "Berabere!<small>Yeniden başlatmak için buraya dokun.</small>";
         }
       } else {
+        let meText = mySymbol ? ("Sen: " + mySymbol + " • ") : "";
         statusEl.innerHTML =
-          "Sıra: " + state.currentPlayer +
+          meText + "Sıra: " + state.currentPlayer +
           "<small>Tahtayı sıfırlamak için buraya dokun.</small>";
       }
     }
@@ -229,10 +255,21 @@
       return null;
     }
 
-    // Hücreye tıklama
     async function playCell(index) {
+      // Rol seçilmemişse hamle yok
+      if (!mySymbol) {
+        alert("Önce bu telefonda X mi O mu oynayacağını seç.");
+        return;
+      }
       if (!localState) return;
       if (localState.gameOver) return;
+
+      // Sıra bende mi?
+      if (localState.currentPlayer !== mySymbol) {
+        // Sıra karşı tarafta, hamle yapma
+        return;
+      }
+
       if (localState.board[index] !== "") return;
 
       const newState = structuredClone(localState);
@@ -248,23 +285,42 @@
         newState.winner = "";
         newState.winLine = [];
       } else {
-        newState.currentPlayer = (newState.currentPlayer === "X") ? "O" : "X";
+        newState.currentPlayer =
+          (newState.currentPlayer === "X") ? "O" : "X";
       }
 
-      // Durumu Firebase'e yaz → diğer telefona gidecek
       await set(gameRef, newState);
     }
 
-    // Oyunu sıfırla
     async function resetGame() {
       await set(gameRef, defaultState);
     }
 
-    // Firebase'deki değişiklikleri dinle
+    // Rol seçme: bir kere seçilir, sonra değişmez
+    function chooseSymbol(symbol) {
+      if (mySymbol && mySymbol !== symbol) {
+        alert("Bu telefonda rol zaten: " + mySymbol);
+        return;
+      }
+      mySymbol = symbol;
+
+      const xBtn = document.getElementById("roleX");
+      const oBtn = document.getElementById("roleO");
+      xBtn.classList.remove("active");
+      oBtn.classList.remove("active");
+
+      if (mySymbol === "X") xBtn.classList.add("active");
+      if (mySymbol === "O") oBtn.classList.add("active");
+
+      render(localState);
+    }
+
+    // Firebase'deki oyunu dinle
     onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
       const connEl = document.getElementById("conn");
       connEl.classList.add("online");
+      connEl.innerHTML = "<span></span>Bağlı";
 
       if (data) {
         localState = data;
@@ -277,13 +333,14 @@
       console.error(error);
       const connEl = document.getElementById("conn");
       connEl.classList.remove("online");
+      connEl.innerHTML = "<span></span>Bağlantı hatası";
     });
 
-    // HTML içindeki onclick'lerin görebilmesi için global yap
+    // HTML'den erişilebilsin diye global yap
     window.playCell = playCell;
     window.resetGame = resetGame;
+    window.chooseSymbol = chooseSymbol;
 
-    // Sayfa ilk açıldığında bağlantı göstergesi
     window.addEventListener("load", () => {
       const connEl = document.getElementById("conn");
       connEl.innerHTML = "<span></span>Firebase'e bağlanılıyor...";
@@ -292,9 +349,14 @@
 </head>
 <body>
   <h1>Online XOX</h1>
-  <div id="subtitle">Aynı linkten giren iki telefon birlikte oynar.</div>
+  <div id="subtitle">Aynı link → farklı telefonlar → gerçek zamanlı oyun.</div>
 
   <div id="gameCard">
+    <div id="roleRow">
+      <button id="roleX" class="roleBtn" onclick="chooseSymbol('X')">Bu telefonda X oynasın</button>
+      <button id="roleO" class="roleBtn" onclick="chooseSymbol('O')">Bu telefonda O oynasın</button>
+    </div>
+
     <div id="status" onclick="resetGame()">
       Sıra: X
       <small>Tahtayı sıfırlamak için buraya dokun.</small>
@@ -313,7 +375,7 @@
     </div>
 
     <button id="resetBtn" onclick="resetGame()">Yeniden Başlat</button>
-    <div id="hint">Siz X olun, kız arkadaşınız O olsun; sırayla dokunarak oynayın.</div>
+    <div id="hint">Bir telefonda X tuşuna, diğer telefonda O tuşuna basın. Herkes sadece kendi harfini ve kendi sırası geldiğinde oynar.</div>
     <div id="conn"><span></span>Bağlantı bekleniyor...</div>
   </div>
 </body>
