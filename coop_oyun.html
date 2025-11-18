@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Co-op Telefon Oyunu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    #gameCanvas {
+      margin-top: 10px;
+      background: #222;
+      border: 1px solid #444;
+      max-width: 100%;
+      touch-action: none;
+    }
+    input, button {
+      width: 80%;
+      padding: 10px;
+      margin: 5px;
+      border-radius: 6px;
+      border: none;
+    }
+    #buttons {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, 70px);
+      gap: 5px;
+      justify-content: center;
+    }
+    #buttons button {
+      padding: 15px;
+      border-radius: 6px;
+      border: none;
+      background: #444;
+      color: #fff;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Co-op Mini Oyun</h2>
+
+  <div id="controls">
+    <input id="nickname" placeholder="Adın (Burak)" />
+    <input id="room" placeholder="Oda kodu (love1)" />
+    <button id="joinBtn">Odaya Gir</button>
+    <p id="status">Henüz bağlı değil.</p>
+  </div>
+
+  <canvas id="gameCanvas" width="320" height="400"></canvas>
+
+  <div id="buttons">
+    <div></div>
+    <button id="up">▲</button>
+    <div></div>
+    <button id="left">◀</button>
+    <div></div>
+    <button id="right">▶</button>
+    <div></div>
+    <button id="down">▼</button>
+    <div></div>
+  </div>
+
+  <!-- Firebase v8 – Realtime Database için en stabil sürüm -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDX0wA69-G_EnDIOXnQZlEfaD6lsQEkJ_k",
+      authDomain: "coop2025-93420.firebaseapp.com",
+      databaseURL: "https://coop2025-93420-default-rtdb.europe-west1.firebasedatabase.app/",
+      projectId: "coop2025-93420",
+      storageBucket: "coop2025-93420.firebasestorage.app",
+      messagingSenderId: "671774331816",
+      appId: "1:671774331816:web:138d0d76ad4d2c7e16439d",
+      measurementId: "G-2Z4SYD5NBL"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let myId = null;
+    let roomRef = null;
+    let roomCode = null;
+
+    // Odaya gir
+    document.getElementById("joinBtn").onclick = () => {
+      const name = document.getElementById("nickname").value.trim();
+      roomCode = document.getElementById("room").value.trim();
+
+      if (!name || !roomCode) {
+        alert("Ad ve oda kodu gerekli.");
+        return;
+      }
+
+      document.getElementById("status").innerText = "Odaya bağlanılıyor...";
+
+      roomRef = db.ref("rooms/" + roomCode);
+
+      roomRef.child("players").transaction((players) => {
+        if (!players) players = {};
+
+        if (!players.p1) {
+          myId = "p1";
+          players.p1 = { name, x: 50, y: 200 };
+        } else if (!players.p2) {
+          myId = "p2";
+          players.p2 = { name, x: 270, y: 200 };
+        } else {
+          alert("Oda dolu.");
+          return;
+        }
+
+        return players;
+      }, (error, committed) => {
+        if (committed) {
+          document.getElementById("status").innerText =
+            "Odaya girdin! Kimlik: " + myId.toUpperCase();
+
+          roomRef.on("value", (snap) => {
+            const data = snap.val();
+            draw(data);
+          });
+
+          roomRef.child("players").child(myId).onDisconnect().remove();
+        }
+      });
+    };
+
+    // Hareket
+    function move(dx, dy) {
+      if (!roomRef || !myId) return;
+
+      const playerRef = roomRef.child("players").child(myId);
+
+      playerRef.transaction((p) => {
+        if (!p) return p;
+
+        const speed = 10;
+        p.x += dx * speed;
+        p.y += dy * speed;
+
+        if (p.x < 10) p.x = 10;
+        if (p.x > 310) p.x = 310;
+        if (p.y < 10) p.y = 10;
+        if (p.y > 390) p.y = 390;
+
+        return p;
+      });
+    }
+
+    document.getElementById("up").onclick = () => move(0, -1);
+    document.getElementById("down").onclick = () => move(0, 1);
+    document.getElementById("left").onclick = () => move(-1, 0);
+    document.getElementById("right").onclick = () => move(1, 0);
+
+    // Çizim
+    function draw(state) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#333";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!state || !state.players) return;
+
+      for (let id in state.players) {
+        const p = state.players[id];
+
+        ctx.fillStyle = id === myId ? "#4caf50" : "#2196f3";
+        ctx.fillRect(p.x - 10, p.y - 10, 20, 20);
+
+        ctx.fillStyle = "#fff";
+        ctx.fillText(p.name, p.x - 15, p.y - 15);
+      }
+    }
+  </script>
+
+</body>
+</html>
