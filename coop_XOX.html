@@ -1,142 +1,121 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>XO Çift Oyuncu</title>
-    <style>
-        body { 
-            font-family: Arial; 
-            text-align: center; 
-            margin-top: 40px; 
-        }
-        #board {
-            display: grid;
-            grid-template-columns: repeat(3, 100px);
-            gap: 10px;
-            margin: auto;
-            width: 320px;
-        }
-        .cell {
-            width: 100px;
-            height: 100px;
-            background: #eee;
-            font-size: 60px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-        }
-        #status { margin-top: 20px; font-size: 20px;}
-    </style>
+  <meta charset="UTF-8">
+  <title>Çevrim İçi XOX</title>
+  <style>
+    body { text-align:center; background:#111; color:white; font-family:Arial; }
+    h1 { margin-top:30px; }
+    #board {
+      width:300px;
+      margin:20px auto;
+      display:grid;
+      grid-template-columns:repeat(3, 100px);
+      gap:5px;
+    }
+    .cell {
+      width:100px; height:100px;
+      background:#222;
+      font-size:60px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      cursor:pointer;
+      border-radius:10px;
+      user-select:none;
+    }
+    .cell:hover { background:#333; }
+    #status { margin-top:10px; }
+    button { margin:5px; padding:8px 14px; }
+  </style>
 
-    <!-- Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+  <!-- Firebase compat scriptleri (global firebase değişkeni verir) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-        // Firebase CONFIG (seninki)
-        const firebaseConfig = {
-            apiKey: "AIzaSyDX0wA69-G_EnDIOXnQZlEfaD6lsQEkJ_k",
-            authDomain: "coop2025-93420.firebaseapp.com",
-            projectId: "coop2025-93420",
-            storageBucket: "coop2025-93420.firebasestorage.app",
-            messagingSenderId: "671774331816",
-            appId: "1:671774331816:web:138d0d76ad4d2c7e16439d",
-            measurementId: "G-2Z4SYD5NBL"
-        };
+  <script>
+    // Firebase ayarların
+    const firebaseConfig = {
+      apiKey: "AIzaSyDX0wA69-G_EnDIOXnQZlEfaD6lsQEkJ_k",
+      authDomain: "coop2025-93420.firebaseapp.com",
+      projectId: "coop2025-93420",
+      storageBucket: "coop2025-93420.firebasestorage.app",
+      messagingSenderId: "671774331816",
+      appId: "1:671774331816:web:138d0d76ad4d2c7e16439d",
+      measurementId: "G-2Z4SYD5NBL",
+      databaseURL: "https://coop2025-93420-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+    // Firebase başlat
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-        const room = "global_room"; // oda kodu YOK, HERKES AYNI ODADA
+    // Oda / tahta referansı
+    const roomRef = db.ref("oda1");
+    const boardRef = roomRef.child("board");
 
-        let player = null;
-        let currentTurn = "X";
+    let board = ["","","","","","","","",""];
+    let mySymbol = ""; // "X" veya "O"
 
-        const boardRef = ref(db, room + "/board");
-        const turnRef = ref(db, room + "/turn");
-        const playersRef = ref(db, room + "/players");
+    // Sayfa açılınca tahtayı dinle
+    boardRef.on("value", (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        board = data;
+      }
+      refreshBoard();
+    });
 
-        // Yeni katılan oyuncuya X veya O ata
-        onValue(playersRef, (snap) => {
-            let players = snap.val();
+    function refreshBoard() {
+      for (let i = 0; i < 9; i++) {
+        const cell = document.getElementById("c" + i);
+        cell.innerText = board[i] || "";
+      }
+    }
 
-            if (!players) {
-                set(playersRef, { p1: "X" });
-                player = "X";
-            } else if (!players.p2) {
-                set(playersRef, { p1: "X", p2: "O" });
-                player = "O";
-            } else if (!player) {
-                player = "X"; // 3. kişi gelse bile izleyici olur
-            }
+    // Sembol seçme
+    function chooseSymbol(symbol) {
+      mySymbol = symbol;
+      document.getElementById("status").innerText =
+        "Sen: " + mySymbol + "   |  Diğer kişi de diğer harfi seçsin.";
+    }
 
-            updateStatus();
-        });
-
-        // Tahta verisini dinle
-        onValue(boardRef, (snap) => {
-            const data = snap.val();
-            if (data) {
-                loadBoard(data);
-            }
-        });
-
-        // Sıra takibi
-        onValue(turnRef, (snap) => {
-            currentTurn = snap.val() || "X";
-            updateStatus();
-        });
-
-        function updateStatus() {
-            const s = document.getElementById("status");
-            s.innerHTML = "Sen: " + player + " | Sıra: " + currentTurn;
-        }
-
-        // Tahtayı tıkla
-        function clickCell(i) {
-            if (player !== currentTurn) return;
-
-            boardRef.once = null;
-
-            onValue(boardRef, (snap) => {
-                let board = snap.val() || ["", "", "", "", "", "", "", "", ""];
-
-                if (board[i] !== "") return;
-
-                board[i] = player;
-
-                set(boardRef, board);
-                set(turnRef, player === "X" ? "O" : "X");
-            }, { onlyOnce: true });
-        }
-
-        // Tahtayı yükle
-        function loadBoard(board) {
-            for (let i = 0; i < 9; i++) {
-                document.getElementById("c" + i).innerHTML = board[i];
-            }
-        }
-    </script>
-
+    // Hücreye tıklama
+    function playCell(index) {
+      if (!mySymbol) {
+        alert("Önce X veya O seç.");
+        return;
+      }
+      if (board[index] !== "") {
+        return; // dolu hücre
+      }
+      board[index] = mySymbol;
+      boardRef.set(board); // herkesin tahtası güncellenir
+    }
+  </script>
 </head>
 <body>
+  <h1>Çevrim İçi XOX</h1>
 
-<h2>Gerçek Zamanlı XO Oyunu</h2>
+  <div>
+    <button onclick="chooseSymbol('X')">X olarak oyna</button>
+    <button onclick="chooseSymbol('O')">O olarak oyna</button>
+  </div>
 
-<div id="board">
-    <div class="cell" id="c0" onclick="clickCell(0)"></div>
-    <div class="cell" id="c1" onclick="clickCell(1)"></div>
-    <div class="cell" id="c2" onclick="clickCell(2)"></div>
-    <div class="cell" id="c3" onclick="clickCell(3)"></div>
-    <div class="cell" id="c4" onclick="clickCell(4)"></div>
-    <div class="cell" id="c5" onclick="clickCell(5)"></div>
-    <div class="cell" id="c6" onclick="clickCell(6)"></div>
-    <div class="cell" id="c7" onclick="clickCell(7)"></div>
-    <div class="cell" id="c8" onclick="clickCell(8)"></div>
-</div>
+  <div id="status">Önce X veya O seç.</div>
 
-<div id="status"></div>
+  <div id="board">
+    <div class="cell" id="c0" onclick="playCell(0)"></div>
+    <div class="cell" id="c1" onclick="playCell(1)"></div>
+    <div class="cell" id="c2" onclick="playCell(2)"></div>
+    <div class="cell" id="c3" onclick="playCell(3)"></div>
+    <div class="cell" id="c4" onclick="playCell(4)"></div>
+    <div class="cell" id="c5" onclick="playCell(5)"></div>
+    <div class="cell" id="c6" onclick="playCell(6)"></div>
+    <div class="cell" id="c7" onclick="playCell(7)"></div>
+    <div class="cell" id="c8" onclick="playCell(8)"></div>
+  </div>
 
+  <p>Linki sevgiline gönderin; biri X, diğeri O seçip aynı tahtada oynayabilirsiniz.</p>
 </body>
 </html>
